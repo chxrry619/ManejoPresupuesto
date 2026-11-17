@@ -1,0 +1,76 @@
+﻿@model IEnumerable<TipoCuenta>
+@{
+    ViewData["Title"] = "Tipos Cuentas";
+}
+
+<h1>Tipos Cuentas</h1>
+<h5>
+    El tipo de cuenta se refiere a como podemos agrupar cuentas.
+    Ejemplos: Préstamos, Tarjetas de Crédito, Cuentas de Ahorro, Cuentas Corrientes, etc.
+</h5>
+
+<a asp-action="Crear" class="btn btn-primary mb-3">Crear nuevo</a>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody id="reordenable">
+        @foreach (var tipoCuenta in Model)
+        {
+            <tr>
+                <td>@tipoCuenta.Nombre</td>
+                <td>
+                    <input type="hidden" value="@tipoCuenta.Id" class="ids" />
+                    <a asp-action="Editar" asp-route-id="@tipoCuenta.Id" class="btn btn-warning">Editar</a>
+                    <a class="btn btn-danger" asp-action="Borrar" asp-route-id="@tipoCuenta.Id">Borrar</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <!-- Asegúrate de tener jQuery UI cargado (puedes ponerlo aquí o en _Layout.cshtml) -->
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+    <script>
+        const urlOrdenar = '@Url.Action("ordenar")';
+
+        $(function () {
+            $("#reordenable").sortable({
+                stop: async function (e, ui) {
+                    await actualizarOrdenes();
+                }
+            });
+
+            async function actualizarOrdenes() {
+                const ids = obtenerIdsDeElementos();
+                await enviarIdsAlBackend(ids);
+            }
+
+            function obtenerIdsDeElementos() {
+                // Sin la barra invertida (\)
+                const ids = $(".ids").map(function () {
+                    return $(this).val();
+                }).get();
+                return ids;
+            }
+
+            async function enviarIdsAlBackend(ids) {
+                var data = JSON.stringify(ids);
+
+                await fetch(urlOrdenar, {
+                    method: 'POST',
+                    body: data,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+            }
+        });
+    </script>
+}

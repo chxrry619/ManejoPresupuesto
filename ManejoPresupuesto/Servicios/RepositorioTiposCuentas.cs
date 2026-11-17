@@ -6,22 +6,91 @@ namespace ManejoPresupuesto.Servicios
 {
     public interface IRepositorioTiposCuentas
     {
-        void Crear(TipoCuenta tipoCuenta);
+        Task Actualizar(TipoCuenta tipoCuenta);
+        Task Borrar(int id);
+        Task Crear(TipoCuenta tipoCuenta);
+        Task<bool> Existe(string nombre, int usuarioId);
+        Task<IEnumerable<TipoCuenta>> Obtener(int usuarioId);
+        Task<TipoCuenta?> ObtenerPorId(int id, int usuarioId);
+        Task Ordenar(IEnumerable<TipoCuenta> tipoCuentasOrdenados);
     }
+
     public class RepositorioTiposCuentas : IRepositorioTiposCuentas
     {
         private readonly string connectionString;
+
         public RepositorioTiposCuentas(IConfiguration configuration)
         {
-            connectionString = configuration.GetConnectionString("DefaultConnection");
+            connectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException("La cadena de conexión 'DefaultConnection' no existe.");
         }
-        public void Crear(TipoCuenta tipoCuenta)
+
+        public async Task Crear(TipoCuenta tipoCuenta)
         {
             using var connection = new SqlConnection(connectionString);
-            var id = connection.QuerySingle<int>(@"INSERT INTO TipoCuentas (Nombre, UsuarioId, Orden)
-                                            VALUES (@Nombre, @UsuarioId, 0);
-                                            SELECT SCOPE_IDENTITY();", tipoCuenta);
+            var id = await connection.QuerySingleAsync<int>(
+                @"INSERT INTO TipoCuentas (Nombre, UsuarioId, Orden)
+                  VALUES (@Nombre, @UsuarioId, 0);
+                  SELECT CAST(SCOPE_IDENTITY() AS INT);", tipoCuenta);
+
             tipoCuenta.Id = id;
+        }
+
+        public async Task<bool> Existe(string nombre, int usuarioId)
+        {
+            using var connection = new SqlConnection(connectionString);
+            var existe = await connection.QueryFirstOrDefaultAsync<int>(
+                @"SELECT 1
+                  FROM TipoCuentas
+                  WHERE Nombre = @Nombre AND UsuarioId = @UsuarioId;",
+                new { Nombre = nombre, UsuarioId = usuarioId });
+
+            return existe == 1;
+        }
+
+        public async Task<IEnumerable<TipoCuenta>> Obtener(int usuarioId)
+        {
+            using var connection = new SqlConnection(connectionString);
+            return await connection.QueryAsync<TipoCuenta>(
+                @"SELECT Id, Nombre, Orden
+                  FROM TipoCuentas
+                  WHERE UsuarioId = @UsuarioId
+                  ORDER BY Orden",
+                new { usuarioId });
+        }
+
+        public async Task Actualizar(TipoCuenta tipoCuenta)
+        {
+            using var connection = new SqlConnection(connectionString);
+            await connection.ExecuteAsync(
+                @"UPDATE TipoCuentas 
+                  SET Nombre = @Nombre 
+                  WHERE Id = @Id", tipoCuenta);
+        }
+
+        public async Task<TipoCuenta?> ObtenerPorId(int id, int usuarioId)
+        {
+            using var connection = new SqlConnection(connectionString);
+            return await connection.QueryFirstOrDefaultAsync<TipoCuenta>(
+                @"SELECT Id, Nombre, Orden 
+                  FROM TipoCuentas 
+                  WHERE Id = @Id AND UsuarioId = @UsuarioId",
+                new { Id = id, UsuarioId = usuarioId }
+            );
+        }
+
+        public async Task Borrar(int id)
+        {
+            using var connection = new SqlConnection(connectionString);
+            await connection.ExecuteAsync("DELETE TipoCuentas WHERE Id = @Id", new { Id = id });
+        }
+
+        public async Task Ordenar(IEnumerable<TipoCuenta> tipoCuentasOrdenados)
+        {
+            using var connection = new SqlConnection(connectionString);
+            var query = "UPDATE TipoCuentas SET Orden = @Orden WHERE Id = @Id";
+            await connection.ExecuteAsync(query, tipoCuentasOrdenados);
+            
         }
     }
 }
